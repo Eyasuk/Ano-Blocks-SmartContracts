@@ -48,6 +48,24 @@ contract Etbc is ERC20, Pausable, Ownable {
         emit Mint(msg.sender, collateralAmount, stablecoinAmount);
     }
 
+    function mintForDeposit(uint256 collateralAmount, address user)
+        external
+        whenNotPaused
+    {
+        require(collateralAmount > 0, "Invalid collateral amount");
+
+        uint256 stablecoinAmount = calculateStablecoinAmount(collateralAmount);
+
+        collateralToken.transferFrom(
+            msg.sender,
+            address(this),
+            collateralAmount
+        );
+        _mint(user, stablecoinAmount);
+
+        emit Mint(user, collateralAmount, stablecoinAmount);
+    }
+
     function redeem(uint256 stablecoinAmount) external whenNotPaused {
         require(stablecoinAmount > 0, "Invalid stablecoin amount");
 

@@ -1,87 +1,80 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-
-contract Etbc is ERC20, Pausable, Ownable {
-    IERC20 public collateralToken;
-    uint256 public collateralRatio;
-    uint256 public constant COLLATERAL_RATIO_PRECISION = 1e6;
-
-    event Mint(
-        address indexed to,
-        uint256 collateralAmount,
-        uint256 stablecoinAmount
-    );
-    event Redeem(
-        address indexed from,
-        uint256 collateralAmount,
-        uint256 stablecoinAmount
-    );
-
-    constructor(IERC20 _collateralToken, uint256 _collateralRatio)
-        ERC20("Etbc Stablecoin", "ETBC")
-    {
-        collateralToken = _collateralToken;
-        collateralRatio = _collateralRatio;
+contract Dao {
+    struct Proposal {
+        string name;
+        string description;
+        uint256 voteStartingDate;
+        uint256 voteEndingDate;
+        uint256 voteAganist;
+        uint256 voteFor;
     }
 
-    function setCollateralRatio(uint256 _collateralRatio) external onlyOwner {
-        collateralRatio = _collateralRatio;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => mapping(address => bool)) voters;
+    uint256 public proposalId;
+
+    function addVote(
+        string calldata _name,
+        string calldata description,
+        uint256 startingDate,
+        uint256 endingDate
+    ) public {
+        proposalId++;
+        uint256 id = proposalId;
+        Proposal storage proposal = proposals[id];
+        proposal.name = _name;
+        proposal.description = description;
+        proposal.voteStartingDate = startingDate;
+        proposal.voteEndingDate = endingDate;
+        proposal.voteAganist = 0;
+        proposal.voteFor = 0;
     }
 
-    function mint(uint256 collateralAmount) external whenNotPaused {
-        require(collateralAmount > 0, "Invalid collateral amount");
-
-        uint256 stablecoinAmount = calculateStablecoinAmount(collateralAmount);
-
-        collateralToken.transferFrom(
-            msg.sender,
-            address(this),
-            collateralAmount
+    function voting(uint256 _proposalId, bool _vote) public {
+        require(!voters[_proposalId][msg.sender], "already voted");
+        require(proposalId >= _proposalId, "proposal doesnot exisit");
+        require(
+            block.timestamp >= proposals[_proposalId].voteStartingDate,
+            "voting not started"
         );
-        _mint(msg.sender, stablecoinAmount);
-
-        emit Mint(msg.sender, collateralAmount, stablecoinAmount);
+        require(
+            block.timestamp < proposals[_proposalId].voteEndingDate,
+            "voting ended"
+        );
+        voters[_proposalId][msg.sender] = true;
+        if (_vote) {
+            proposals[_proposalId].voteFor++;
+        } else {
+            proposals[_proposalId].voteAganist++;
+        }
     }
 
-    function redeem(uint256 stablecoinAmount) external whenNotPaused {
-        require(stablecoinAmount > 0, "Invalid stablecoin amount");
-
-        uint256 collateralAmount = calculateCollateralAmount(stablecoinAmount);
-
-        _burn(msg.sender, stablecoinAmount);
-        collateralToken.transfer(msg.sender, collateralAmount);
-
-        emit Redeem(msg.sender, collateralAmount, stablecoinAmount);
-    }
-
-    function calculateStablecoinAmount(uint256 collateralAmount)
+    function getProposal(uint256 _proposalId)
         public
         view
-        returns (uint256)
+        returns (Proposal memory)
     {
-        return
-            (collateralAmount * collateralRatio) / COLLATERAL_RATIO_PRECISION;
+        return proposals[_proposalId];
     }
 
-    function calculateCollateralAmount(uint256 stablecoinAmount)
+    function getProposals()
         public
         view
-        returns (uint256)
+        returns (Proposal[] memory, bool[] memory)
     {
-        return
-            (stablecoinAmount * COLLATERAL_RATIO_PRECISION) / collateralRatio;
+        Proposal[] memory ret = new Proposal[](proposalId);
+        bool[] memory voted = new bool[](proposalId);
+
+        for (uint256 i = 1; i <= proposalId; i++) {
+            ret[i - 1] = proposals[i];
+            voted[i - 1] = voters[i][msg.sender];
+        }
+        return (ret, voted);
     }
 
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
+    function isUserVoted(uint256 _id) public view returns (bool) {
+        return voters[_id][msg.sender];
     }
 }
