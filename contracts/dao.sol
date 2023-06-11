@@ -11,6 +11,16 @@ contract Dao {
         uint256 voteFor;
     }
 
+    struct ResponseProposal {
+        string name;
+        string description;
+        uint256 voteStartingDate;
+        uint256 voteEndingDate;
+        uint256 voteAganist;
+        uint256 voteFor;
+        bool status;
+    }
+
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => bool)) voters;
     uint256 public proposalId;
@@ -59,19 +69,19 @@ contract Dao {
         return proposals[_proposalId];
     }
 
-    function getProposals()
-        public
-        view
-        returns (Proposal[] memory, bool[] memory)
-    {
-        Proposal[] memory ret = new Proposal[](proposalId);
-        bool[] memory voted = new bool[](proposalId);
+    function getProposals() public view returns (ResponseProposal[] memory) {
+        ResponseProposal[] memory ret = new ResponseProposal[](proposalId);
 
         for (uint256 i = 1; i <= proposalId; i++) {
-            ret[i - 1] = proposals[i];
-            voted[i - 1] = voters[i][msg.sender];
+            ret[i - 1].name = proposals[i].name;
+            ret[i - 1].description = proposals[i].description;
+            ret[i - 1].voteStartingDate = proposals[i].voteStartingDate;
+            ret[i - 1].voteEndingDate = proposals[i].voteEndingDate;
+            ret[i - 1].voteFor = proposals[i].voteFor;
+            ret[i - 1].voteAganist = proposals[i].voteAganist;
+            ret[i - 1].status = voters[i][msg.sender];
         }
-        return (ret, voted);
+        return ret;
     }
 
     function isUserVoted(uint256 _id) public view returns (bool) {
